@@ -11,45 +11,44 @@
       font-family: "Yu Mincho", serif; /* Keeping for aesthetic, can change if needed */
       line-height: 1.6;
       padding: 80px 40px;
-      overflow: hidden;
+      overflow: hidden; /* Prevent scrollbars during animation */
       display: flex;
-      justify-content: center;
-      align-items: flex-start;
-      min-height: 100vh;
+      justify-content: center; /* Horizontally center content */
+      align-items: flex-start; /* Vertically align content to top */
+      min-height: 100vh; /* Full viewport height */
       box-sizing: border-box;
-      position: relative; /* For absolute positioning of remaining letters */
+      position: relative;
     }
 
-    .story {
-      max-width: 800px;
+    .story-container {
+      max-width: 800px; /* Fixed width to prevent layout shifts */
       text-align: left;
+      position: relative; /* For positioning characters absolutely relative to this container */
     }
 
     .story span {
       display: inline-block;
-      position: relative;
+      position: relative; /* Base for transform */
       transition: transform 1.5s ease-in, opacity 1.5s ease-in;
       will-change: transform, opacity;
-      white-space: pre; /* Preserve white space */
+      white-space: pre; /* Preserve white space for layout integrity */
     }
 
     .falling {
       transform: translateY(60vh) rotateZ(calc(90deg * var(--random-rotation))) translateX(calc(200px * var(--random-x)));
-      opacity: 0; /* Changed to 0 for full disappearance */
+      opacity: 0; /* Fully disappear */
     }
 
-    /* Initial state for remaining letters (fixed position, no transform yet) */
     .remaining {
-      opacity: 1; /* Ensure visibility */
-      position: absolute; /* Allows precise positioning later */
-      color: black; /* Ensure color remains black */
-      /* No transform initially, will be applied in JS */
+      opacity: 1; /* Always visible */
+      position: absolute; /* Take out of flow for precise movement */
+      color: black;
+      /* Initial position set by JS before transform */
     }
 
-    /* Animation for moving and sizing remaining letters */
     .remaining.animate-to-center {
-      transition: transform 2s ease-out, font-size 0.5s ease-out 1.5s; /* Font size transition starts later */
-      z-index: 10; /* Ensure they are on top */
+      transition: transform 2s ease-out, font-size 0.5s ease-out 1.5s; /* Smooth movement and delayed size change */
+      z-index: 10; /* Ensure on top */
     }
 
     .remaining.animate-to-center.final-position {
@@ -58,7 +57,9 @@
   </style>
 </head>
 <body>
-  <div class="story" id="story">
+  <div class="story-container" id="story-container">
+    <div class="story" id="story">
+    </div>
   </div>
 
   <script>
@@ -71,42 +72,37 @@ Encouraged by those words, Shiwa-chan peered into the shrine's depths and discov
 Seasons came and went, and the forest showed many faces, but the bond between Washi-chan and Shiwa-chan continued to shine brightly, like that seven-colored stone. They knew that their mutual existence was the most precious treasure of all.`;
 
     const storyContainer = document.getElementById("story");
-    let spans = []; // Store spans to access later
+    const fullStoryContainer = document.getElementById("story-container"); // The container with fixed width
+    let spans = [];
 
-    // Characters to remain, each appearing twice, ensuring separation
     const charactersToKeep = [
-      { char: 'w', count: 2, indices: [] },
-      { char: 'a', count: 2, indices: [] },
-      { char: 's', count: 2, indices: [] },
-      { char: 'h', count: 2, indices: [] },
-      { char: 'i', count: 2, indices: [] }
+      { char: 'w', count: 2, originalChar: 'w', indices: [] }, // Added originalChar for case preservation logic
+      { char: 'a', count: 2, originalChar: 'a', indices: [] },
+      { char: 's', count: 2, originalChar: 's', indices: [] },
+      { char: 'h', count: 2, originalChar: 'h', indices: [] },
+      { char: 'i', count: 2, originalChar: 'i', indices: [] }
     ];
     let keptIndices = new Set(); // To ensure unique positions for kept letters
 
-    // Function to find suitable indices for characters to keep
     function findKeepIndices() {
-      const tempSpans = [];
-      // Treat text as individual characters for index finding
-      for (let char of text) {
-        tempSpans.push(char);
-      }
+      // Create a temporary array of characters from the text to find suitable indices
+      const tempChars = text.split('');
 
       charactersToKeep.forEach(target => {
         let count = 0;
         while (count < target.count) {
-          const char = target.char;
           let randomIndex;
           let foundSuitable = false;
           let attempts = 0;
-          const maxAttempts = 1000;
+          const maxAttempts = 2000; // Increased attempts for better chance
 
           while (!foundSuitable && attempts < maxAttempts) {
-            randomIndex = Math.floor(Math.random() * tempSpans.length);
-            const actualCharAtIndex = tempSpans[randomIndex].toLowerCase();
+            randomIndex = Math.floor(Math.random() * tempChars.length);
+            const actualCharAtIndex = tempChars[randomIndex].toLowerCase();
 
-            // Ensure it's the target character, not already kept, and sufficiently far from others
-            if (actualCharAtIndex === char && !keptIndices.has(randomIndex)) {
+            if (actualCharAtIndex === target.char && !keptIndices.has(randomIndex)) {
               let tooClose = false;
+              // Check proximity to existing kept indices
               for (let keptIdx of keptIndices) {
                 if (Math.abs(randomIndex - keptIdx) < 5) { // Ensure at least 5 characters separation
                   tooClose = true;
@@ -125,17 +121,35 @@ Seasons came and went, and the forest showed many faces, but the bond between Wa
             keptIndices.add(randomIndex);
             count++;
           } else {
-            console.warn(`Could not find a suitable unique index for character '${char}' (instance ${count + 1}).`);
-            break;
+            // Fallback: if cannot find separated unique indices, find any unique index
+            console.warn(`Could not find a separated unique index for '${target.char}'. Trying any unique index.`);
+            let fallbackIndex;
+            let fallbackAttempts = 0;
+            while(fallbackAttempts < maxAttempts) {
+                fallbackIndex = Math.floor(Math.random() * tempChars.length);
+                if (tempChars[fallbackIndex].toLowerCase() === target.char && !keptIndices.has(fallbackIndex)) {
+                    foundSuitable = true;
+                    break;
+                }
+                fallbackAttempts++;
+            }
+            if (foundSuitable) {
+                target.indices.push(fallbackIndex);
+                keptIndices.add(fallbackIndex);
+                count++;
+            } else {
+                console.error(`Failed to find any unique index for character '${target.char}' (instance ${count + 1}).`);
+                break;
+            }
           }
         }
       });
     }
 
-    // Call this before creating spans to determine which to keep
+    // Determine indices *before* creating spans
     findKeepIndices();
 
-    // Create spans for each character and mark those to keep
+    // Create spans for each character
     for (let i = 0; i < text.length; i++) {
       const char = text[i];
       const span = document.createElement("span");
@@ -144,120 +158,118 @@ Seasons came and went, and the forest showed many faces, but the bond between Wa
 
       if (keptIndices.has(i)) {
         span.classList.add("remaining");
-        // For remaining characters, set their initial absolute position immediately
-        // This must be done AFTER the span is appended to the DOM for getBoundingClientRect to work
-        // and BEFORE any transforms are applied, to capture their true initial render position.
+        // Store the original character to preserve its case if it's W, S, A, I, H
+        // before potentially changing it to 'W' or 'S' later.
+        span.setAttribute('data-original-char', char);
       }
       storyContainer.appendChild(span);
       spans.push(span);
     }
 
-    // Filter out only the spans that will remain
     const remainingSpans = spans.filter(span => span.classList.contains('remaining'));
 
-    // Capture initial positions of remaining spans *after* they've been rendered
-    // This is crucial for smooth transition from their original place.
-    const initialRemainingPositions = new Map();
-    remainingSpans.forEach(span => {
-      const rect = span.getBoundingClientRect();
-      initialRemainingPositions.set(span, { left: rect.left, top: rect.top });
-      // Apply initial absolute positioning
-      span.style.left = `${rect.left}px`;
-      span.style.top = `${rect.top}px`;
-    });
-
-    // 3 seconds delay before animation starts
-    setTimeout(() => {
-      let maxFallTime = 0; // To track when all characters have fallen
-
-      spans.forEach((span, index) => {
-        // Only apply falling animation to non-remaining characters
-        if (!span.classList.contains("remaining")) {
-          const charRect = span.getBoundingClientRect();
-          // Use a fixed start reference for falling characters
-          const startRect = spans[0].getBoundingClientRect();
-          const startX = startRect.left;
-          const startY = startRect.top;
-
-          const distance = Math.sqrt(Math.pow(charRect.left - startX, 2) + Math.pow(charRect.top - startY, 2));
-          const delay = distance * 5; // Distance 1px = 5ms delay
-
-          const randomRotation = Math.random() * 2 - 1;
-          const randomX = Math.random() * 2 - 1;
-          span.style.setProperty('--random-rotation', randomRotation);
-          span.style.setProperty('--random-x', randomX);
-
-          setTimeout(() => {
-            span.classList.add("falling");
-          }, delay);
-          // Calculate when this character will finish falling
-          const fallFinishTime = delay + 1500; // 1500ms is the transition duration
-          if (fallFinishTime > maxFallTime) {
-            maxFallTime = fallFinishTime;
-          }
-        }
-      });
-
-      // After all falling animations are complete
-      setTimeout(() => {
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
-
-        // Target positions for "Washi" and "Shiwa" (adjust as needed for perfect centering)
-        const washiTargetY = viewportHeight / 2 - 25; // Slightly above center
-        const shiwaTargetY = viewportHeight / 2 + 25; // Slightly below center
-
-        const letterWidthEstimate = 24; // Approximation for 24pt font, adjust if necessary
-        const wordWashiWidth = 'Washi'.length * letterWidthEstimate;
-        const wordShiwaWidth = 'Shiwa'.length * letterWidthEstimate;
-
-        // Map characters to their final desired positions and indices
-        // IMPORTANT: The order here must match the intended order of remainingSpans after sorting
-        const finalArrangement = [
-          { char: 'W', targetX: (viewportWidth / 2) - (wordWashiWidth / 2), targetY: washiTargetY },
-          { char: 'a', targetX: (viewportWidth / 2) - (wordWashiWidth / 2) + (1 * letterWidthEstimate), targetY: washiTargetY },
-          { char: 's', targetX: (viewportWidth / 2) - (wordWashiWidth / 2) + (2 * letterWidthEstimate), targetY: washiTargetY },
-          { char: 'h', targetX: (viewportWidth / 2) - (wordWashiWidth / 2) + (3 * letterWidthEstimate), targetY: washiTargetY },
-          { char: 'i', targetX: (viewportWidth / 2) - (wordWashiWidth / 2) + (4 * letterWidthEstimate), targetY: washiTargetY },
-          { char: 'S', targetX: (viewportWidth / 2) - (wordShiwaWidth / 2), targetY: shiwaTargetY },
-          { char: 'h', targetX: (viewportWidth / 2) - (wordShiwaWidth / 2) + (1 * letterWidthEstimate), targetY: shiwaTargetY },
-          { char: 'i', targetX: (viewportWidth / 2) - (wordShiwaWidth / 2) + (2 * letterWidthEstimate), targetY: shiwaTargetY },
-          { char: 'w', targetX: (viewportWidth / 2) - (wordShiwaWidth / 2) + (3 * letterWidthEstimate), targetY: shiwaTargetY },
-          { char: 'a', targetX: (viewportWidth / 2) - (wordShiwaWidth / 2) + (4 * letterWidthEstimate), targetY: shiwaTargetY }
-        ];
-
-        // Sort remainingSpans by their original index to maintain a consistent order for mapping
-        remainingSpans.sort((a, b) => parseInt(a.dataset.index) - parseInt(b.dataset.index));
-
-        remainingSpans.forEach((span, i) => {
-          const target = finalArrangement[i];
-          if (target) {
-            // Ensure correct capitalization for 'Washi' and 'Shiwa'
-            if (i === 0) span.textContent = 'W'; // First char for Washi
-            if (i === 5) span.textContent = 'S'; // First char for Shiwa
-
-            // Get initial position relative to the viewport
-            const initialPos = initialRemainingPositions.get(span);
-
-            // Calculate the delta for the transform
-            const deltaX = target.targetX - initialPos.left;
-            const deltaY = target.targetY - initialPos.top;
-
-            // Apply the transform for smooth movement
-            span.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
-            span.classList.add('animate-to-center'); // Add class to enable transition
-          }
+    // Capture initial positions of remaining spans *after* they've been rendered in their original flow.
+    // This needs to happen after the DOM is laid out.
+    // Use requestAnimationFrame to ensure layout is complete.
+    requestAnimationFrame(() => {
+        remainingSpans.forEach(span => {
+            const rect = span.getBoundingClientRect();
+            // Set initial absolute position relative to the viewport
+            span.style.left = `${rect.left}px`;
+            span.style.top = `${rect.top}px`;
+            // Crucial: Take them out of the document flow after their initial position is captured
+            // This prevents them from affecting the layout as other text falls.
+            // Also, setting position:absolute means their 'top' and 'left' are relative to the *nearest positioned ancestor*.
+            // Since body has position:relative, they are relative to the viewport.
         });
 
-        // Set size change to happen 1.5 seconds before movement ends (2s - 1.5s = 0.5s into movement)
+        // Initial 3 seconds delay before any animation starts
         setTimeout(() => {
-          remainingSpans.forEach(span => {
-            span.classList.add('final-position');
-          });
-        }, 500); // 0.5s into the movement (which lasts 2s)
+          let maxFallTime = 0; // To track when all characters have fallen
 
-      }, maxFallTime + 100); // Wait a little extra after all characters have fallen
-    }, 3000); // Initial 3 seconds delay before any animation starts
+          spans.forEach((span) => {
+            if (!span.classList.contains("remaining")) {
+              const charRect = span.getBoundingClientRect();
+              const startRect = spans[0].getBoundingClientRect(); // Reference first char for distance
+              const distance = Math.sqrt(Math.pow(charRect.left - startRect.left, 2) + Math.pow(charRect.top - startRect.top, 2));
+              const delay = distance * 5; // Distance 1px = 5ms delay
+
+              const randomRotation = Math.random() * 2 - 1;
+              const randomX = Math.random() * 2 - 1;
+              span.style.setProperty('--random-rotation', randomRotation);
+              span.style.setProperty('--random-x', randomX);
+
+              setTimeout(() => {
+                span.classList.add("falling");
+              }, delay);
+              // Calculate when this character will finish falling
+              const fallFinishTime = delay + 1500; // 1500ms is the transition duration
+              if (fallFinishTime > maxFallTime) {
+                maxFallTime = fallFinishTime;
+              }
+            }
+          });
+
+          // After all falling animations are complete (or a buffer time)
+          setTimeout(() => {
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+
+            // Target positions for "Washi" and "Shiwa" (adjust as needed for perfect centering)
+            const washiTargetY = viewportHeight / 2 - 25; // Slightly above center for 'Washi'
+            const shiwaTargetY = viewportHeight / 2 + 25; // Slightly below center for 'Shiwa'
+
+            const letterWidthEstimate = 24; // Approximation for 24pt font, adjust if necessary
+            const wordWashiWidth = 'Washi'.length * letterWidthEstimate;
+            const wordShiwaWidth = 'Shiwa'.length * letterWidthEstimate;
+
+            // Define the final characters and their target positions in the center
+            const finalArrangement = [
+              { char: 'W', targetX: (viewportWidth / 2) - (wordWashiWidth / 2), targetY: washiTargetY },
+              { char: 'a', targetX: (viewportWidth / 2) - (wordWashiWidth / 2) + (1 * letterWidthEstimate), targetY: washiTargetY },
+              { char: 's', targetX: (viewportWidth / 2) - (wordWashiWidth / 2) + (2 * letterWidthEstimate), targetY: washiTargetY },
+              { char: 'h', targetX: (viewportWidth / 2) - (wordWashiWidth / 2) + (3 * letterWidthEstimate), targetY: washiTargetY },
+              { char: 'i', targetX: (viewportWidth / 2) - (wordWashiWidth / 2) + (4 * letterWidthEstimate), targetY: washiTargetY },
+              { char: 'S', targetX: (viewportWidth / 2) - (wordShiwaWidth / 2), targetY: shiwaTargetY },
+              { char: 'h', targetX: (viewportWidth / 2) - (wordShiwaWidth / 2) + (1 * letterWidthEstimate), targetY: shiwaTargetY },
+              { char: 'i', targetX: (viewportWidth / 2) - (wordShiwaWidth / 2) + (2 * letterWidthEstimate), targetY: shiwaTargetY },
+              { char: 'w', targetX: (viewportWidth / 2) - (wordShiwaWidth / 2) + (3 * letterWidthEstimate), targetY: shiwaTargetY },
+              { char: 'a', targetX: (viewportWidth / 2) - (wordShiwaWidth / 2) + (4 * letterWidthEstimate), targetY: shiwaTargetY }
+            ];
+
+            // Sort remainingSpans by their original index to match `finalArrangement`
+            remainingSpans.sort((a, b) => parseInt(a.dataset.index) - parseInt(b.dataset.index));
+
+            // Assign the sorted remaining spans to their final target positions
+            remainingSpans.forEach((span, i) => {
+              const target = finalArrangement[i];
+              if (target) {
+                // Set text content based on the target character, preserving case for W and S
+                span.textContent = target.char;
+
+                // Get current position (which is the initial captured position)
+                const currentRect = span.getBoundingClientRect();
+
+                // Calculate the delta for the transform
+                const deltaX = target.targetX - currentRect.left;
+                const deltaY = target.targetY - currentRect.top;
+
+                // Apply the transform for smooth movement
+                span.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+                span.classList.add('animate-to-center'); // Add class to enable CSS transition
+              }
+            });
+
+            // Set size change to happen 1.5 seconds before movement ends
+            setTimeout(() => {
+              remainingSpans.forEach(span => {
+                span.classList.add('final-position');
+              });
+            }, 500); // 0.5s into the 2s movement duration
+
+          }, maxFallTime + 100); // Small buffer after all characters have finished falling
+        }, 3000); // Initial delay before any animation
+    });
   </script>
 </body>
 </html>
