@@ -29,7 +29,6 @@
     .story span {
       display: inline-block;
       position: relative; /* Base for transform */
-      /* No initial transition for remaining characters, will be added later */
       transition: transform 1.5s ease-in, opacity 1.5s ease-in;
       will-change: transform, opacity;
       white-space: pre; /* Preserve white space for layout integrity */
@@ -44,19 +43,17 @@
       opacity: 1; /* Always visible */
       position: relative; /* Stay in document flow initially */
       color: black;
-      /* Crucial: No initial transform or absolute positioning here.
-         It will be set via JS *after* capturing its initial position,
-         and only when it starts moving. */
     }
 
     .remaining.moving {
       position: absolute; /* Take out of flow when movement starts */
-      transition: transform 2s ease-out, font-size 0.5s ease-out 1.5s; /* Smooth movement and delayed size change */
+      transition: transform 2s ease-out, font-size 0.5s ease-out 1.5s, letter-spacing 0.5s ease-out 1.5s; /* Smooth movement, delayed size/spacing change */
       z-index: 10; /* Ensure on top */
     }
 
     .remaining.moving.final-position {
       font-size: 48pt !important; /* Double the size */
+      letter-spacing: 5px; /* Add letter spacing to prevent overlap */
     }
   </style>
 </head>
@@ -121,7 +118,6 @@ Seasons came and went, and the forest showed many faces, but the bond between Wa
             keptIndices.add(randomIndex);
             count++;
           } else {
-            // Fallback if strict separation isn't possible
             console.warn(`Could not find a separated unique index for '${target.char}'. Trying any unique index.`);
             let fallbackIndex;
             let fallbackAttempts = 0;
@@ -163,17 +159,13 @@ Seasons came and went, and the forest showed many faces, but the bond between Wa
 
     const remainingSpans = spans.filter(span => span.classList.contains('remaining'));
 
-    // Wait for the initial layout to be complete before capturing positions
     requestAnimationFrame(() => {
-        // Capture initial positions *before* any falling animation
         const initialRemainingPositions = new Map();
         remainingSpans.forEach(span => {
             const rect = span.getBoundingClientRect();
-            // Store coordinates relative to the viewport
             initialRemainingPositions.set(span, { left: rect.left, top: rect.top });
         });
 
-        // Initial 3 seconds delay before any animation starts
         setTimeout(() => {
           let maxFallTime = 0;
 
@@ -199,15 +191,15 @@ Seasons came and went, and the forest showed many faces, but the bond between Wa
             }
           });
 
-          // After all falling animations are complete
           setTimeout(() => {
             const viewportWidth = window.innerWidth;
             const viewportHeight = window.innerHeight;
 
-            const washiTargetY = viewportHeight / 2 - 25;
-            const shiwaTargetY = viewportHeight / 2 + 25;
+            const washiTargetY = viewportHeight / 2 - 40; // Adjust Y for better separation between lines
+            const shiwaTargetY = viewportHeight / 2 + 40; // Adjust Y for better separation between lines
 
-            const letterWidthEstimate = 24;
+            // Increase letterWidthEstimate to create more space between letters
+            const letterWidthEstimate = 35; // Increased from 24 to 35
             const wordWashiWidth = 'Washi'.length * letterWidthEstimate;
             const wordShiwaWidth = 'Shiwa'.length * letterWidthEstimate;
 
@@ -229,33 +221,28 @@ Seasons came and went, and the forest showed many faces, but the bond between Wa
             remainingSpans.forEach((span, i) => {
               const target = finalArrangement[i];
               if (target) {
-                // Set text content based on the target character
                 span.textContent = target.char;
 
-                // Set initial absolute position (relative to viewport) for smooth movement
                 const initialPos = initialRemainingPositions.get(span);
                 span.style.left = `${initialPos.left}px`;
                 span.style.top = `${initialPos.top}px`;
-                span.classList.add('moving'); // Add moving class to enable absolute positioning and transition
+                span.classList.add('moving');
 
-                // Calculate the delta for the transform
                 const deltaX = target.targetX - initialPos.left;
                 const deltaY = target.targetY - initialPos.top;
 
-                // Apply the transform for smooth movement
                 span.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
               }
             });
 
-            // Set size change to happen 1.5 seconds before movement ends
             setTimeout(() => {
               remainingSpans.forEach(span => {
                 span.classList.add('final-position');
               });
             }, 500);
 
-          }, maxFallTime + 100); // Small buffer after all characters have finished falling
-        }, 3000); // Initial delay before any animation
+          }, maxFallTime + 100);
+        }, 3000);
     });
   </script>
 </body>
