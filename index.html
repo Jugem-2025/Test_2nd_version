@@ -23,12 +23,13 @@
     .story-container {
       max-width: 800px; /* Fixed width to prevent layout shifts */
       text-align: left;
-      position: relative; /* For positioning characters absolutely relative to this container */
+      position: relative; /* For positioning absolute children relative to this container */
     }
 
     .story span {
       display: inline-block;
       position: relative; /* Base for transform */
+      /* No initial transition for remaining characters, will be added later */
       transition: transform 1.5s ease-in, opacity 1.5s ease-in;
       will-change: transform, opacity;
       white-space: pre; /* Preserve white space for layout integrity */
@@ -41,17 +42,20 @@
 
     .remaining {
       opacity: 1; /* Always visible */
-      position: absolute; /* Take out of flow for precise movement */
+      position: relative; /* Stay in document flow initially */
       color: black;
-      /* Initial position set by JS before transform */
+      /* Crucial: No initial transform or absolute positioning here.
+         It will be set via JS *after* capturing its initial position,
+         and only when it starts moving. */
     }
 
-    .remaining.animate-to-center {
+    .remaining.moving {
+      position: absolute; /* Take out of flow when movement starts */
       transition: transform 2s ease-out, font-size 0.5s ease-out 1.5s; /* Smooth movement and delayed size change */
       z-index: 10; /* Ensure on top */
     }
 
-    .remaining.animate-to-center.final-position {
+    .remaining.moving.final-position {
       font-size: 48pt !important; /* Double the size */
     }
   </style>
@@ -72,29 +76,26 @@ Encouraged by those words, Shiwa-chan peered into the shrine's depths and discov
 Seasons came and went, and the forest showed many faces, but the bond between Washi-chan and Shiwa-chan continued to shine brightly, like that seven-colored stone. They knew that their mutual existence was the most precious treasure of all.`;
 
     const storyContainer = document.getElementById("story");
-    const fullStoryContainer = document.getElementById("story-container"); // The container with fixed width
     let spans = [];
 
     const charactersToKeep = [
-      { char: 'w', count: 2, originalChar: 'w', indices: [] }, // Added originalChar for case preservation logic
-      { char: 'a', count: 2, originalChar: 'a', indices: [] },
-      { char: 's', count: 2, originalChar: 's', indices: [] },
-      { char: 'h', count: 2, originalChar: 'h', indices: [] },
-      { char: 'i', count: 2, originalChar: 'i', indices: [] }
+      { char: 'w', count: 2, indices: [] },
+      { char: 'a', count: 2, indices: [] },
+      { char: 's', count: 2, indices: [] },
+      { char: 'h', count: 2, indices: [] },
+      { char: 'i', count: 2, indices: [] }
     ];
     let keptIndices = new Set(); // To ensure unique positions for kept letters
 
     function findKeepIndices() {
-      // Create a temporary array of characters from the text to find suitable indices
       const tempChars = text.split('');
-
       charactersToKeep.forEach(target => {
         let count = 0;
         while (count < target.count) {
           let randomIndex;
           let foundSuitable = false;
           let attempts = 0;
-          const maxAttempts = 2000; // Increased attempts for better chance
+          const maxAttempts = 2000;
 
           while (!foundSuitable && attempts < maxAttempts) {
             randomIndex = Math.floor(Math.random() * tempChars.length);
@@ -102,9 +103,8 @@ Seasons came and went, and the forest showed many faces, but the bond between Wa
 
             if (actualCharAtIndex === target.char && !keptIndices.has(randomIndex)) {
               let tooClose = false;
-              // Check proximity to existing kept indices
               for (let keptIdx of keptIndices) {
-                if (Math.abs(randomIndex - keptIdx) < 5) { // Ensure at least 5 characters separation
+                if (Math.abs(randomIndex - keptIdx) < 5) {
                   tooClose = true;
                   break;
                 }
@@ -121,7 +121,7 @@ Seasons came and went, and the forest showed many faces, but the bond between Wa
             keptIndices.add(randomIndex);
             count++;
           } else {
-            // Fallback: if cannot find separated unique indices, find any unique index
+            // Fallback if strict separation isn't possible
             console.warn(`Could not find a separated unique index for '${target.char}'. Trying any unique index.`);
             let fallbackIndex;
             let fallbackAttempts = 0;
@@ -146,21 +146,16 @@ Seasons came and went, and the forest showed many faces, but the bond between Wa
       });
     }
 
-    // Determine indices *before* creating spans
     findKeepIndices();
 
-    // Create spans for each character
     for (let i = 0; i < text.length; i++) {
       const char = text[i];
       const span = document.createElement("span");
       span.textContent = char;
-      span.setAttribute('data-index', i); // Store original index
+      span.setAttribute('data-index', i);
 
       if (keptIndices.has(i)) {
         span.classList.add("remaining");
-        // Store the original character to preserve its case if it's W, S, A, I, H
-        // before potentially changing it to 'W' or 'S' later.
-        span.setAttribute('data-original-char', char);
       }
       storyContainer.appendChild(span);
       spans.push(span);
@@ -168,31 +163,26 @@ Seasons came and went, and the forest showed many faces, but the bond between Wa
 
     const remainingSpans = spans.filter(span => span.classList.contains('remaining'));
 
-    // Capture initial positions of remaining spans *after* they've been rendered in their original flow.
-    // This needs to happen after the DOM is laid out.
-    // Use requestAnimationFrame to ensure layout is complete.
+    // Wait for the initial layout to be complete before capturing positions
     requestAnimationFrame(() => {
+        // Capture initial positions *before* any falling animation
+        const initialRemainingPositions = new Map();
         remainingSpans.forEach(span => {
             const rect = span.getBoundingClientRect();
-            // Set initial absolute position relative to the viewport
-            span.style.left = `${rect.left}px`;
-            span.style.top = `${rect.top}px`;
-            // Crucial: Take them out of the document flow after their initial position is captured
-            // This prevents them from affecting the layout as other text falls.
-            // Also, setting position:absolute means their 'top' and 'left' are relative to the *nearest positioned ancestor*.
-            // Since body has position:relative, they are relative to the viewport.
+            // Store coordinates relative to the viewport
+            initialRemainingPositions.set(span, { left: rect.left, top: rect.top });
         });
 
         // Initial 3 seconds delay before any animation starts
         setTimeout(() => {
-          let maxFallTime = 0; // To track when all characters have fallen
+          let maxFallTime = 0;
 
           spans.forEach((span) => {
             if (!span.classList.contains("remaining")) {
               const charRect = span.getBoundingClientRect();
-              const startRect = spans[0].getBoundingClientRect(); // Reference first char for distance
+              const startRect = spans[0].getBoundingClientRect();
               const distance = Math.sqrt(Math.pow(charRect.left - startRect.left, 2) + Math.pow(charRect.top - startRect.top, 2));
-              const delay = distance * 5; // Distance 1px = 5ms delay
+              const delay = distance * 5;
 
               const randomRotation = Math.random() * 2 - 1;
               const randomX = Math.random() * 2 - 1;
@@ -202,28 +192,25 @@ Seasons came and went, and the forest showed many faces, but the bond between Wa
               setTimeout(() => {
                 span.classList.add("falling");
               }, delay);
-              // Calculate when this character will finish falling
-              const fallFinishTime = delay + 1500; // 1500ms is the transition duration
+              const fallFinishTime = delay + 1500;
               if (fallFinishTime > maxFallTime) {
                 maxFallTime = fallFinishTime;
               }
             }
           });
 
-          // After all falling animations are complete (or a buffer time)
+          // After all falling animations are complete
           setTimeout(() => {
             const viewportWidth = window.innerWidth;
             const viewportHeight = window.innerHeight;
 
-            // Target positions for "Washi" and "Shiwa" (adjust as needed for perfect centering)
-            const washiTargetY = viewportHeight / 2 - 25; // Slightly above center for 'Washi'
-            const shiwaTargetY = viewportHeight / 2 + 25; // Slightly below center for 'Shiwa'
+            const washiTargetY = viewportHeight / 2 - 25;
+            const shiwaTargetY = viewportHeight / 2 + 25;
 
-            const letterWidthEstimate = 24; // Approximation for 24pt font, adjust if necessary
+            const letterWidthEstimate = 24;
             const wordWashiWidth = 'Washi'.length * letterWidthEstimate;
             const wordShiwaWidth = 'Shiwa'.length * letterWidthEstimate;
 
-            // Define the final characters and their target positions in the center
             const finalArrangement = [
               { char: 'W', targetX: (viewportWidth / 2) - (wordWashiWidth / 2), targetY: washiTargetY },
               { char: 'a', targetX: (viewportWidth / 2) - (wordWashiWidth / 2) + (1 * letterWidthEstimate), targetY: washiTargetY },
@@ -237,26 +224,26 @@ Seasons came and went, and the forest showed many faces, but the bond between Wa
               { char: 'a', targetX: (viewportWidth / 2) - (wordShiwaWidth / 2) + (4 * letterWidthEstimate), targetY: shiwaTargetY }
             ];
 
-            // Sort remainingSpans by their original index to match `finalArrangement`
             remainingSpans.sort((a, b) => parseInt(a.dataset.index) - parseInt(b.dataset.index));
 
-            // Assign the sorted remaining spans to their final target positions
             remainingSpans.forEach((span, i) => {
               const target = finalArrangement[i];
               if (target) {
-                // Set text content based on the target character, preserving case for W and S
+                // Set text content based on the target character
                 span.textContent = target.char;
 
-                // Get current position (which is the initial captured position)
-                const currentRect = span.getBoundingClientRect();
+                // Set initial absolute position (relative to viewport) for smooth movement
+                const initialPos = initialRemainingPositions.get(span);
+                span.style.left = `${initialPos.left}px`;
+                span.style.top = `${initialPos.top}px`;
+                span.classList.add('moving'); // Add moving class to enable absolute positioning and transition
 
                 // Calculate the delta for the transform
-                const deltaX = target.targetX - currentRect.left;
-                const deltaY = target.targetY - currentRect.top;
+                const deltaX = target.targetX - initialPos.left;
+                const deltaY = target.targetY - initialPos.top;
 
                 // Apply the transform for smooth movement
                 span.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
-                span.classList.add('animate-to-center'); // Add class to enable CSS transition
               }
             });
 
@@ -265,7 +252,7 @@ Seasons came and went, and the forest showed many faces, but the bond between Wa
               remainingSpans.forEach(span => {
                 span.classList.add('final-position');
               });
-            }, 500); // 0.5s into the 2s movement duration
+            }, 500);
 
           }, maxFallTime + 100); // Small buffer after all characters have finished falling
         }, 3000); // Initial delay before any animation
