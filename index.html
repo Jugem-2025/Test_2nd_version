@@ -54,7 +54,7 @@
 
     .remaining.moving.final-position {
       font-size: 48pt !important; /* Double the size */
-      letter-spacing: 5px; /* Add letter spacing to prevent overlap */
+      letter-spacing: 10px; /* Increased letter spacing */
     }
   </style>
 </head>
@@ -97,7 +97,8 @@ Seasons came and went, and the forest showed many faces, but the bond between Wa
 
           while (!foundSuitable && attempts < maxAttempts) {
             randomIndex = Math.floor(Math.random() * tempChars.length);
-            const actualCharAtIndex = tempChars[randomIndex].toLowerCase();
+            const actualCharAtIndex = tempChars.charCodeAt(randomIndex) >= 97 && tempChars.charCodeAt(randomIndex) <= 122 ? tempChars.charAt(randomIndex) : tempChars.charAt(randomIndex).toLowerCase();
+
 
             if (actualCharAtIndex === target.char && !keptIndices.has(randomIndex)) {
               let tooClose = false;
@@ -124,7 +125,8 @@ Seasons came and went, and the forest showed many faces, but the bond between Wa
             let fallbackAttempts = 0;
             while(fallbackAttempts < maxAttempts) {
                 fallbackIndex = Math.floor(Math.random() * tempChars.length);
-                if (tempChars[fallbackIndex].toLowerCase() === target.char && !keptIndices.has(fallbackIndex)) {
+                const actualCharAtIndex = tempChars.charCodeAt(randomIndex) >= 97 && tempChars.charCodeAt(randomIndex) <= 122 ? tempChars.charAt(randomIndex) : tempChars.charAt(randomIndex).toLowerCase();
+                if (actualCharAtIndex === target.char && !keptIndices.has(fallbackIndex)) {
                     foundSuitable = true;
                     break;
                 }
@@ -146,7 +148,7 @@ Seasons came and went, and the forest showed many faces, but the bond between Wa
     findKeepIndices();
 
     for (let i = 0; i < text.length; i++) {
-      const char = text[i];
+      const char = text.charAt(i);
       const span = document.createElement("span");
       span.textContent = char;
       span.setAttribute('data-index', i);
@@ -173,7 +175,7 @@ Seasons came and went, and the forest showed many faces, but the bond between Wa
           spans.forEach((span) => {
             if (!span.classList.contains("remaining")) {
               const charRect = span.getBoundingClientRect();
-              const startRect = spans[0].getBoundingClientRect();
+              const startRect = spans.at(0)?.getBoundingClientRect() ?? { left: 0, top: 0 };
               const distance = Math.sqrt(Math.pow(charRect.left - startRect.left, 2) + Math.pow(charRect.top - startRect.top, 2));
               const delay = distance * 5;
 
@@ -199,7 +201,7 @@ Seasons came and went, and the forest showed many faces, but the bond between Wa
             const washiTargetY = viewportHeight / 2 - 40;
             const shiwaTargetY = viewportHeight / 2 + 40;
 
-            const letterWidthEstimate = 35;
+            const letterWidthEstimate = 40;
             const wordWashiWidth = 'Washi'.length * letterWidthEstimate;
             const wordShiwaWidth = 'Shiwa'.length * letterWidthEstimate;
 
@@ -219,7 +221,7 @@ Seasons came and went, and the forest showed many faces, but the bond between Wa
             remainingSpans.sort((a, b) => parseInt(a.dataset.index) - parseInt(b.dataset.index));
 
             remainingSpans.forEach((span, i) => {
-              const target = finalArrangement[i];
+              const target = finalArrangement.at(i);
               if (target) {
                 span.textContent = target.char;
 
