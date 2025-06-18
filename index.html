@@ -35,7 +35,8 @@
     }
 
     .falling {
-      transform: translateY(60vh) rotateZ(calc(90deg * var(--random-rotation))) translateX(calc(200px * var(--random-x)));
+      /* Adjust translateY to make letters fall within view */
+      transform: translateY(40vh) rotateZ(calc(90deg * var(--random-rotation))) translateX(calc(200px * var(--random-x)));
       opacity: 0; /* Fully disappear */
     }
 
@@ -195,11 +196,10 @@ Seasons came and went, and the forest showed many faces, but the bond between Wa
             const viewportWidth = window.innerWidth;
             const viewportHeight = window.innerHeight;
 
-            const washiTargetY = viewportHeight / 2 - 40; // Adjust Y for better separation between lines
-            const shiwaTargetY = viewportHeight / 2 + 40; // Adjust Y for better separation between lines
+            const washiTargetY = viewportHeight / 2 - 40;
+            const shiwaTargetY = viewportHeight / 2 + 40;
 
-            // Increase letterWidthEstimate to create more space between letters
-            const letterWidthEstimate = 35; // Increased from 24 to 35
+            const letterWidthEstimate = 35;
             const wordWashiWidth = 'Washi'.length * letterWidthEstimate;
             const wordShiwaWidth = 'Shiwa'.length * letterWidthEstimate;
 
